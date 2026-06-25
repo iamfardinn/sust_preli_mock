@@ -7,35 +7,40 @@ A lightweight Express.js API that classifies bKash customer support tickets usin
 
 ## Table of Contents
 - [Prerequisites](#prerequisites)
-- [Installation](#installation)
+- [Local Setup](#local-setup)
 - [Configuration](#configuration)
-- [Running the Server](#running-the-server)
+- [Running Locally](#running-locally)
+- [Deployment](#deployment)
+  - [Vercel](#deploy-to-vercel)
+  - [Render](#deploy-to-render)
 - [API Reference](#api-reference)
   - [GET /health](#get-health)
   - [POST /sort-ticket](#post-sort-ticket)
-- [Sample cURL Commands](#sample-curl-commands)
+- [Testing the API](#testing-the-api)
 - [Business Rules](#business-rules)
+- [Project Structure](#project-structure)
 - [Submission](#submission)
 
 ---
 
 ## Prerequisites
 | Tool | Version |
-|------|---------|
+|------|---------| 
 | Node.js | ≥ 18.x |
 | npm | ≥ 9.x |
-| Gemini API Key | Active key from [Google AI Studio](https://aistudio.google.com/) |
+| Git | any |
+| Gemini API Key | Free key from [Google AI Studio](https://aistudio.google.com/) |
 
 ---
 
-## Installation
+## Local Setup
 
 ```bash
-# Clone the repository
-git clone https://github.com/iamfardinn/queuestorm-warmup.git
-cd queuestorm-warmup
+# 1. Clone the repository
+git clone https://github.com/iamfardinn/sust_preli_mock.git
+cd sust_preli_mock
 
-# Install dependencies
+# 2. Install all dependencies
 npm install
 ```
 
@@ -43,11 +48,11 @@ npm install
 
 ## Configuration
 
-Copy the `.env` template and fill in your credentials:
+Create your `.env` file in the project root:
 
 ```bash
-# The .env file is already present in the repo root as a template
-# Edit it and replace the placeholder with your real API key
+# Windows (PowerShell)
+Copy-Item .env.example .env   # if example exists, otherwise create manually
 ```
 
 **.env**
@@ -56,21 +61,87 @@ PORT=3000
 GEMINI_API_KEY=your_actual_gemini_api_key_here
 ```
 
-> **⚠️ Never commit your `.env` file.** It is listed in `.gitignore`.
+Get your free API key at → **[aistudio.google.com](https://aistudio.google.com/)** → Get API Key → Create API Key
+
+> **⚠️ Never commit your `.env` file.** It is listed in `.gitignore` and will NOT be pushed to GitHub.
 
 ---
 
-## Running the Server
+## Running Locally
 
 ```bash
-# Production
+# Start the server
 npm start
 
-# Development (auto-restart on file changes — requires nodemon)
+# Development mode (auto-restart on file changes)
 npm run dev
 ```
 
-The server will start on `http://localhost:3000` by default.
+The server starts at **[http://localhost:3000](http://localhost:3000)**
+
+- Frontend UI → `http://localhost:3000/`
+- Health check → `http://localhost:3000/health`
+- Classify ticket → `POST http://localhost:3000/sort-ticket`
+
+---
+
+## Deployment
+
+### Deploy to Vercel
+
+Vercel is the recommended platform — it auto-deploys on every `git push`.
+
+**Step 1 — Push your code to GitHub** (already done if you cloned this repo)
+
+**Step 2 — Connect to Vercel**
+1. Go to **[vercel.com/new](https://vercel.com/new)**
+2. Click **"Import Git Repository"**
+3. Select `iamfardinn/sust_preli_mock`
+4. Leave all build settings as default (Vercel auto-detects `vercel.json`)
+
+**Step 3 — Add environment variable**
+
+In the Vercel project settings under **Environment Variables**, add:
+```
+GEMINI_API_KEY = your_actual_gemini_api_key_here
+```
+
+**Step 4 — Deploy**
+
+Click **Deploy**. Your live URL will be:
+```
+https://sust-preli-mock.vercel.app
+```
+
+**Future deploys** happen automatically on every `git push`:
+```bash
+git add .
+git commit -m "your message"
+git push
+# Vercel auto-redeploys in ~30 seconds
+```
+
+---
+
+### Deploy to Render
+
+Render is a great alternative with a persistent server (no cold starts).
+
+1. Go to **[render.com](https://render.com)** → **New → Web Service**
+2. Connect your GitHub repo `iamfardinn/sust_preli_mock`
+3. Fill in the settings:
+
+| Setting | Value |
+|---------|-------|
+| **Build Command** | `npm install` |
+| **Start Command** | `npm start` |
+| **Environment** | `Node` |
+
+4. Add environment variable:
+```
+GEMINI_API_KEY = your_actual_gemini_api_key_here
+```
+5. Click **Create Web Service**
 
 ---
 
@@ -128,6 +199,14 @@ Content-Type: application/json
 }
 ```
 
+**Response `429 Too Many Requests`** (rate limit exceeded):
+```json
+{
+  "error": "Too Many Requests",
+  "message": "Ticket classification limit reached (10/min). Please wait before submitting another ticket."
+}
+```
+
 #### Allowed Enum Values
 
 | Field | Allowed Values |
@@ -136,46 +215,48 @@ Content-Type: application/json
 | `severity` | `low`, `medium`, `high`, `critical` |
 | `department` | `customer_support`, `dispute_resolution`, `payments_ops`, `fraud_risk` |
 
+#### Rate Limits
+| Endpoint | Limit |
+|----------|-------|
+| All routes | 100 requests / minute / IP |
+| `/sort-ticket` | 10 requests / minute / IP |
+
 ---
 
-## Sample cURL Commands
+## Testing the API
 
-### Health Check
-```bash
-curl -X GET http://localhost:3000/health
+### Using the Web UI
+Open `http://localhost:3000` (or your Vercel URL) in the browser — fill in the form and click **Classify Ticket**.
+
+### Using PowerShell (Windows)
+```powershell
+# Health check
+Invoke-WebRequest -Uri http://localhost:3000/health -UseBasicParsing | Select-Object -ExpandProperty Content
+
+# Classify a ticket
+$body = '{"ticket_id": "T-001", "channel": "app", "message": "I sent money to the wrong number by mistake."}'
+Invoke-WebRequest -Uri http://localhost:3000/sort-ticket -Method POST -ContentType "application/json" -Body $body -UseBasicParsing | Select-Object -ExpandProperty Content
 ```
 
-### Classify a Ticket — Wrong Transfer
+### Using curl (Linux/Mac/Git Bash)
 ```bash
-curl -X POST http://localhost:3000/sort-ticket \
-  -H "Content-Type: application/json" \
-  -d '{
-    "ticket_id": "T-001",
-    "channel": "app",
-    "locale": "bn-BD",
-    "message": "Ami vul number e 500 taka pathiye felchi, please help koro refund er jonno."
-  }'
-```
+# Health check
+curl http://localhost:3000/health
 
-### Classify a Ticket — Phishing Report
-```bash
+# Wrong transfer
 curl -X POST http://localhost:3000/sort-ticket \
   -H "Content-Type: application/json" \
-  -d '{
-    "ticket_id": "T-002",
-    "channel": "web",
-    "message": "Someone called me claiming to be bKash support and asked me for my account details. I think I got scammed."
-  }'
-```
+  -d '{"ticket_id": "T-001", "channel": "app", "locale": "bn-BD", "message": "Ami vul number e 500 taka pathiye felchi, please help koro refund er jonno."}'
 
-### Classify a Ticket — Payment Failed
-```bash
+# Phishing report
 curl -X POST http://localhost:3000/sort-ticket \
   -H "Content-Type: application/json" \
-  -d '{
-    "ticket_id": "T-003",
-    "message": "I tried to pay my electricity bill but the payment keeps failing. Money was deducted but payment shows failed."
-  }'
+  -d '{"ticket_id": "T-002", "message": "Someone called me claiming to be bKash support and asked for my account details. I think I got scammed."}'
+
+# Payment failed
+curl -X POST http://localhost:3000/sort-ticket \
+  -H "Content-Type: application/json" \
+  -d '{"ticket_id": "T-003", "message": "I tried to pay my electricity bill but the payment keeps failing. Money was deducted but payment shows failed."}'
 ```
 
 ---
@@ -184,40 +265,39 @@ curl -X POST http://localhost:3000/sort-ticket \
 
 | Rule | Detail |
 |------|--------|
-| **Response time** | `/health` < 10s &nbsp;·&nbsp; `/sort-ticket` < 30s |
+| **Response time** | `/health` < 10s · `/sort-ticket` < 30s |
 | **Safety — CRITICAL** | `agent_summary` must **never** ask the customer to share their PIN, OTP, password, or full card number |
-| **Enum adherence** | All classification fields are validated against the allowed enums; invalid LLM output is corrected |
+| **Enum adherence** | All classification fields are validated server-side; invalid LLM output is corrected automatically |
 | **Human review** | `human_review_required` is `true` **only** when `severity === "critical"` OR `case_type === "phishing_or_social_engineering"` |
-| **Fallback** | If the LLM call fails, the API returns a safe fallback with `case_type: "other"`, `severity: "high"`, and `human_review_required: true` |
-
----
-
-## Submission
-
-The final code is hosted on GitHub under the **iamfardinn** account:
-
-```
-https://github.com/iamfardinn/queuestorm-warmup
-```
-
-Push your changes before the submission deadline:
-```bash
-git add .
-git commit -m "feat: complete QueueStorm warmup submission"
-git push origin main
-```
+| **Fallback** | If the LLM call fails, a safe fallback is returned: `case_type: "other"`, `severity: "high"`, `human_review_required: true` |
+| **Rate limiting** | Global: 100 req/min · `/sort-ticket`: 10 req/min (protects Gemini quota) |
 
 ---
 
 ## Project Structure
 
 ```
-queuestorm-warmup/
-├── server.js        # Main Express application
-├── package.json     # Dependencies & scripts
-├── .env             # Environment variables (not committed)
-├── .gitignore       # Git ignore rules
-└── README.md        # This file
+sust_preli_mock/
+├── server.js           # Main Express application + Gemini integration
+├── public/
+│   └── index.html      # Frontend UI for testing the API
+├── vercel.json         # Vercel deployment configuration
+├── package.json        # Dependencies & npm scripts
+├── .env                # Environment variables (NOT committed)
+├── .gitignore          # Git ignore rules
+└── README.md           # This file
+```
+
+---
+
+## Submission
+
+Repository: **[github.com/iamfardinn/sust_preli_mock](https://github.com/iamfardinn/sust_preli_mock)**
+
+```bash
+git add .
+git commit -m "feat: complete QueueStorm warmup submission"
+git push origin main
 ```
 
 ---
