@@ -2,6 +2,7 @@
 
 require('dotenv').config();
 
+const path      = require('path');
 const express   = require('express');
 const rateLimit = require('express-rate-limit');
 const { GoogleGenAI } = require('@google/genai');
@@ -222,7 +223,7 @@ const ticketLimiter = rateLimit({
 
 const app = express();
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(globalLimiter);   // Apply global limiter to all routes
 
 // ── GET /health ───────────────────────────────────────────────────────────────
