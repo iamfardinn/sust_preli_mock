@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QueueStorm — Ticket Classifier</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0b0f1a;
+      --surface:   #111827;
+      --card:      #1a2236;
+      --border:    #1f2d45;
+      --accent:    #3b82f6;
+      --accent2:   #6366f1;
+      --green:     #10b981;
+      --yellow:    #f59e0b;
+      --orange:    #f97316;
+      --red:       #ef4444;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --radius:    14px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+    }
+
+    /* ── Header ── */
+    header {
+      max-width: 860px;
+      margin: 0 auto 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-icon {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem;
+    }
+
+    .logo-text h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em; }
+    .logo-text p  { font-size: 0.75rem; color: var(--muted); margin-top: 1px; }
+
+    #health-badge {
+      display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.78rem; font-weight: 500;
+      padding: 0.4rem 0.9rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      transition: all 0.3s;
+    }
+    #health-badge .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+    #health-badge.ok .dot   { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    #health-badge.ok        { border-color: #10b98133; color: var(--green); }
+    #health-badge.error .dot{ background: var(--red); }
+    #health-badge.error     { border-color: #ef444433; color: var(--red); }
+
+    /* ── Main card ── */
+    .main { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem;
+    }
+
+    .card-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 1.25rem;
+    }
+
+    /* ── Form ── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+    .form-group.full { grid-column: 1 / -1; }
+
+    label {
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+
+    input, textarea, select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      padding: 0.65rem 0.9rem;
+      width: 100%;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+    input::placeholder, textarea::placeholder { color: var(--muted); }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px #3b82f620;
+    }
+    textarea { resize: vertical; min-height: 110px; }
+    select option { background: var(--surface); }
+
+    .submit-btn {
+      display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; border-radius: 8px;
+      color: #fff; font-family: 'Inter', sans-serif;
+      font-size: 0.95rem; font-weight: 600;
+      padding: 0.8rem 1.5rem;
+      cursor: pointer;
+      width: 100%; margin-top: 0.5rem;
+      transition: opacity 0.2s, transform 0.15s;
+      position: relative; overflow: hidden;
+    }
+    .submit-btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    .submit-btn:active:not(:disabled) { transform: translateY(0); }
+    .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid #ffffff50;
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    .submit-btn.loading .spinner  { display: block; }
+    .submit-btn.loading .btn-text { display: none; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Result ── */
+    #result-section { display: none; }
+
+    .result-header {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .ticket-id-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--accent);
+      background: #3b82f615;
+      padding: 0.3rem 0.75rem;
+      border-radius: 6px;
+      border: 1px solid #3b82f630;
+    }
+
+    .badges { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .badge {
+      font-size: 0.72rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 0.3rem 0.7rem; border-radius: 6px;
+    }
+
+    .badge-case   { background: #6366f120; color: #a5b4fc; border: 1px solid #6366f135; }
+    .badge-dept   { background: #0ea5e920; color: #7dd3fc; border: 1px solid #0ea5e935; }
+
+    .badge-low      { background: #10b98120; color: #6ee7b7; border: 1px solid #10b98135; }
+    .badge-medium   { background: #f59e0b20; color: #fcd34d; border: 1px solid #f59e0b35; }
+    .badge-high     { background: #f9731620; color: #fdba74; border: 1px solid #f9731635; }
+    .badge-critical { background: #ef444420; color: #fca5a5; border: 1px solid #ef444435; }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .result-item { display: flex; flex-direction: column; gap: 0.3rem; }
+    .result-item label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; }
+    .result-item .value {
+      font-size: 0.9rem; font-weight: 500;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .summary-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.1rem;
+      font-size: 0.88rem;
+      line-height: 1.65;
+      color: #cbd5e1;
+      margin-top: 0.75rem;
+    }
+
+    .review-banner {
+      display: flex; align-items: center; gap: 0.6rem;
+      border-radius: 8px; padding: 0.75rem 1rem;
+      font-size: 0.85rem; font-weight: 500;
+      margin-top: 0.75rem;
+    }
+    .review-banner.needed   { background: #ef444418; border: 1px solid #ef444430; color: #fca5a5; }
+    .review-banner.not-needed { background: #10b98118; border: 1px solid #10b98130; color: #6ee7b7; }
+
+    .confidence-bar-wrap { margin-top: 0.75rem; }
+    .confidence-bar-wrap label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; display: flex; justify-content: space-between; margin-bottom: 0.4rem; }
+    .confidence-bar-track {
+      height: 6px; border-radius: 999px;
+      background: var(--border);
+      overflow: hidden;
+    }
+    .confidence-bar-fill {
+      height: 100%; border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+      width: 0%;
+    }
+
+    /* ── Error ── */
+    .error-box {
+      background: #ef444415;
+      border: 1px solid #ef444430;
+      border-radius: 8px;
+      padding: 1rem 1.1rem;
+      color: #fca5a5;
+      font-size: 0.88rem;
+    }
+
+    /* ── Raw JSON toggle ── */
+    .raw-toggle {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.78rem; color: var(--muted);
+      cursor: pointer; margin-top: 1rem;
+      background: none; border: none;
+      font-family: 'Inter', sans-serif;
+      transition: color 0.2s;
+    }
+    .raw-toggle:hover { color: var(--text); }
+    #raw-json {
+      display: none; margin-top: 0.75rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px; padding: 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem; color: #94a3b8;
+      white-space: pre-wrap; word-break: break-all;
+      max-height: 240px; overflow-y: auto;
+    }
+
+    @media (max-width: 600px) {
+      .form-grid, .result-grid { grid-template-columns: 1fr; }
+      .form-group.full { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div class="logo-text">
+      <h1>QueueStorm Classifier</h1>
+      <p>bKash SUST CSE Carnival 2026 — Warmup Task</p>
+    </div>
+  </div>
+  <div id="health-badge">
+    <div class="dot"></div>
+    <span id="health-text">Checking…</span>
+  </div>
+</header>
+
+<main class="main">
+
+  <!-- Form Card -->
+  <div class="card">
+    <div class="card-title">📨 Submit Ticket</div>
+    <form id="ticket-form">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="ticket_id">Ticket ID *</label>
+          <input id="ticket_id" type="text" placeholder="e.g. T-001" required />
+        </div>
+        <div class="form-group">
+          <label for="channel">Channel (optional)</label>
+          <select id="channel">
+            <option value="">— select —</option>
+            <option value="app">App</option>
+            <option value="web">Web</option>
+            <option value="sms">SMS</option>
+            <option value="call_center">Call Center</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="locale">Locale (optional)</label>
+          <input id="locale" type="text" placeholder="e.g. bn-BD, en-US" />
+        </div>
+        <div class="form-group full">
+          <label for="message">Customer Message *</label>
+          <textarea id="message" placeholder="Paste the customer's support message here…" required></textarea>
+        </div>
+      </div>
+      <button type="submit" class="submit-btn" id="submit-btn">
+        <div class="spinner"></div>
+        <span class="btn-text">🔍 Classify Ticket</span>
+      </button>
+    </form>
+  </div>
+
+  <!-- Result Card -->
+  <div class="card" id="result-section">
+    <div class="card-title">📊 Classification Result</div>
+    <div id="result-body"></div>
+  </div>
+
+</main>
+
+<script>
+  // ── Health check ─────────────────────────────────────────────────────────
+  async function checkHealth() {
+    const badge = document.getElementById('health-badge');
+    const text  = document.getElementById('health-text');
+    try {
+      const res = await fetch('/health');
+      if (res.ok) {
+        badge.className = 'ok';
+        text.textContent = 'API Online';
+      } else throw new Error();
+    } catch {
+      badge.className = 'error';
+      text.textContent = 'API Offline';
+    }
+  }
+  checkHealth();
+  setInterval(checkHealth, 30000);
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function severityBadgeClass(s) {
+    return { low: 'badge-low', medium: 'badge-medium', high: 'badge-high', critical: 'badge-critical' }[s] || 'badge-low';
+  }
+
+  function prettyKey(k) {
+    return k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  // ── Render result ─────────────────────────────────────────────────────────
+  function renderResult(data) {
+    const section = document.getElementById('result-section');
+    const body    = document.getElementById('result-body');
+    section.style.display = 'block';
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    if (data.error && !data.case_type) {
+      body.innerHTML = `<div class="error-box">⚠️ ${data.error}: ${data.message || ''}</div>`;
+      return;
+    }
+
+    const conf = Math.round((data.confidence || 0) * 100);
+
+    body.innerHTML = `
+      <div class="result-header">
+        <span class="ticket-id-label"># ${data.ticket_id}</span>
+        <div class="badges">
+          <span class="badge badge-case">${data.case_type}</span>
+          <span class="badge ${severityBadgeClass(data.severity)}">${data.severity}</span>
+          <span class="badge badge-dept">${data.department}</span>
+        </div>
+      </div>
+
+      <div class="result-grid">
+        <div class="result-item">
+          <label>Case Type</label>
+          <div class="value">${data.case_type}</div>
+        </div>
+        <div class="result-item">
+          <label>Severity</label>
+          <div class="value">${data.severity}</div>
+        </div>
+        <div class="result-item">
+          <label>Department</label>
+          <div class="value">${data.department}</div>
+        </div>
+        <div class="result-item">
+          <label>Confidence</label>
+          <div class="value">${conf}%</div>
+        </div>
+      </div>
+
+      <div class="confidence-bar-wrap">
+        <label><span>Model Confidence</span><span>${conf}%</span></label>
+        <div class="confidence-bar-track">
+          <div class="confidence-bar-fill" id="conf-fill"></div>
+        </div>
+      </div>
+
+      <div class="${data.human_review_required ? 'review-banner needed' : 'review-banner not-needed'}">
+        ${data.human_review_required
+          ? '🚨 Human review required — escalate immediately'
+          : '✅ No human review required — safe to auto-route'}
+      </div>
+
+      <div style="margin-top:1rem">
+        <label style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;">Agent Summary</label>
+        <div class="summary-box">${data.agent_summary}</div>
+      </div>
+
+      <button class="raw-toggle" onclick="toggleRaw()" id="raw-toggle-btn">▶ Show raw JSON</button>
+      <pre id="raw-json">${JSON.stringify(data, null, 2)}</pre>
+    `;
+
+    // Animate confidence bar
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        document.getElementById('conf-fill').style.width = conf + '%';
+      }, 50);
+    });
+  }
+
+  function toggleRaw() {
+    const el  = document.getElementById('raw-json');
+    const btn = document.getElementById('raw-toggle-btn');
+    const visible = el.style.display === 'block';
+    el.style.display = visible ? 'none' : 'block';
+    btn.textContent  = (visible ? '▶' : '▼') + ' ' + (visible ? 'Show' : 'Hide') + ' raw JSON';
+  }
+
+  // ── Form submit ───────────────────────────────────────────────────────────
+  document.getElementById('ticket-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn');
+    btn.classList.add('loading');
+    btn.disabled = true;
+
+    const payload = {
+      ticket_id: document.getElementById('ticket_id').value.trim(),
+      message:   document.getElementById('message').value.trim(),
+    };
+    const channel = document.getElementById('channel').value;
+    const locale  = document.getElementById('locale').value.trim();
+    if (channel) payload.channel = channel;
+    if (locale)  payload.locale  = locale;
+
+    try {
+      const res  = await fetch('/sort-ticket', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload),
+      });
+      const data = await res.json();
+      renderResult(data);
+    } catch (err) {
+      renderResult({ error: 'Network Error', message: err.message });
+    } finally {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
