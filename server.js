@@ -311,11 +311,19 @@ app.use((_req, res) => {
   res.status(404).json({ error: 'Not Found', message: 'The requested endpoint does not exist.' });
 });
 
-// ─── Start Server ─────────────────────────────────────────────────────────────
+// ─── Start Server (local only) ────────────────────────────────────────────────
+// When running on Vercel, the file is imported as a module — app.listen is skipped.
+// When running locally via `npm start`, require.main === module is true.
 
 const PORT = parseInt(process.env.PORT, 10) || 3000;
-app.listen(PORT, () => {
-  console.log(`[INFO] QueueStorm Ticket Classifier running on http://localhost:${PORT}`);
-  console.log(`[INFO] Gemini model : gemini-2.5-flash`);
-  console.log(`[INFO] Endpoints    : GET /health  |  POST /sort-ticket`);
-});
+
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`[INFO] QueueStorm Ticket Classifier running on http://localhost:${PORT}`);
+    console.log(`[INFO] Gemini model : gemini-2.5-flash`);
+    console.log(`[INFO] Endpoints    : GET /health  |  POST /sort-ticket`);
+  });
+}
+
+// Export for Vercel serverless runtime
+module.exports = app;
